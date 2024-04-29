@@ -1,5 +1,6 @@
 import librosa
 import os
+import numpy as np
 import yt_dlp
 import soundfile as sf
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
@@ -96,30 +97,32 @@ def binary_search(arr:list, x:float):
     while left <= right:
         mid = (left + right) // 2
         if arr[mid] == x:
-            return mid, arr[mid]
+            return mid
         elif arr[mid] < x:
             left = mid + 1
         else:
             right = mid - 1
 
     if right < 0:
-        return left, arr[left]
+        return left
     if left >= len(arr):
-        return right, arr[right]
+        return right
     
     if x - arr[right] <= arr[left] - x:
-        return right, arr[right]
+        return right
     else:
-        return left, arr[left]
+        return left
 
 
 
 def synthesize(source:str, 
                destination:str, 
-               seg_length:int=10,               
+               seg_length:int=10,          
+               num_segments:int=None,     
                allow_autotranscript:bool=False, 
                samplerate:int=None, 
-               download:bool=True
+               download:bool=True,
+               skip_existing:bool=True
                ):
     
     if isinstance(source, str) and os.path.exists(source):
@@ -157,7 +160,12 @@ def synthesize(source:str,
         os.makedirs(transcript_folder, exist_ok=True)
 
         audio_outfile = os.path.join(audio_folder, f"{vid}.mp3")
-        if download and not os.path.exists(audio_outfile):
+
+
+        if os.path.exists(audio_outfile) and skip_existing:
+            continue
+
+        if download:
             download_audio(url, audio_outfile)
 
         # Transcript
@@ -179,51 +187,65 @@ def synthesize(source:str,
         
         # Segmenting
         texts, starts, durations = zip(*[(t['text'], t['start'], t['duration']) for t in transcript["text"]])
-        ends = [start + duration for start, duration in zip(starts, durations)]
-        print(vid)
-        print(starts)
-        print(ends)
-        # segments = []
+        # print(vid)
+        # print(starts)
         done = False
         segment_idx, start_idx = 0, 0
-        while not done:
-            # new_segment = {
-            #     'text': [],
-            #     'start': 0,
-            #     'duration': 0
-            # }
 
-            end_idx, end_time = binary_search(ends, segment_length)
-            end_idx+=1
-            
-            new_text = texts[start_idx:end_idx]
-            new_start = starts[start_idx]
-            new_duration = end_time - new_start
-            # new_segment['text'] = new_text
-            # new_segment['start'] = new_start
-            # new_segment['duration'] = new_duration        
-            # segments.append(new_segment)
-            
-            segment_outfile = os.path.join(segment_folder, f"segment_{segment_idx:02}.wav")
-            extract_segment(audio_outfile, segment_outfile, new_start, new_start + new_duration)
 
-            with open(os.path.join(transcript_folder, f"segment_{segment_idx:02}.txt"), "w", encoding="utf-8") as f:
-                text = " ".join(new_text)
-                f.write(text.replace("\n", " "))
+        # Without looping
+        def group(transcript):
+            texts, starts, durations = zip(*[(t['text'], t['start'], t['duration']) for t in transcript["text"]])
 
-            if end_idx == len(ends):
-                done = True
-            
-            start_idx = end_idx
-            segment_length += 10
-            segment_idx += 1
+            segments = list()
+            segment_length = 0
+            start_idx = 0                        
+            for i, start in enumerate(starts):                
+                segment_length += durations[i]
+                if segment_length >= seg_length:
+                    segment_indices = list(range(start_idx, i+1))
+                    new_segment = {
+                        "start": starts[start_idx],
+                        "duration": sum(durations[i] for i in segment_indices),
+                        "text": " ".join(texts[i].replace("\n", " ") for i in segment_indices)
+                    }
+                    segments.append(new_segment)
 
+                    segment_length = 0
+                    start_idx = i+1
+
+            return segments
+
+
+        segments = group(transcript)
+        if num_segments and num_segments < len(segments):
+            random_indices = np.random.choice(len(segments), num_segments, replace=False)
+            segments = [segments[i] for i in random_indices]
+        
+        for i, segment in enumerate(segments):
+            segment_outfile = os.path.join(segment_folder, f"segment_{i:02}.wav")
+            extract_segment(audio_outfile, segment_outfile, segment["start"], segment["start"] + segment["duration"])
+
+            with open(os.path.join(transcript_folder, f"segment_{i:02}.txt"), "w", encoding="utf-8") as f:
+                f.write(segment["text"])
 
 if __name__ == "__main__":
-    synthesize("urls.txt", r"D:\Database\yt-s2t", allow_autotranscript=True, download=True)
+    synthesize( source="urls.txt", 
+                destination=r"D:\Database\yt-s2t", 
+                seg_length=10,
+                num_segments=10,
+                allow_autotranscript=True, 
+                # samplerate=16000,                
+                download=True, 
+                skip_existing=True)
 
+                # source:str, 
+                # destination:str, 
+                # seg_length:int=10,          
+                # num_segments:int=None,     
+                # allow_autotranscript:bool=False, 
+                # samplerate:int=None, 
+                # download:bool=True,
+                # skip_existing:bool=True
 
-        
-
-        
 
