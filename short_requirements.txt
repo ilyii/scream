@@ -1,0 +1,15 @@
+tqdm
+numpy
+pandas
+matplotlib
+seaborn
+
+setuptools
+librosa
+soundfile
+
+scrapetube
+yt-dlp
+youtube-transcript-api
+pytube
+pydub
