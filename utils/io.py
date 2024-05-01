@@ -58,8 +58,6 @@ def plot_specgram(waveform, sample_rate, title="Spectrogram", xlim=None):
   plt.show(block=False)
 
 
-
-
 def get_sine_sweep(sample_rate, offset=0):
   """
   Generate a sine sweep signal. The maximum sweep rate is defined as the maximum frequency change per second.
