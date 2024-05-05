@@ -29,6 +29,10 @@ transformers
 torch_lr_finder
 torch_audiomentations
 openai-whisper
+editdistance
+num2words
+sentencepiece
+protobuf
 
 ### Youtube
 scrapetube
