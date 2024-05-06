@@ -9,6 +9,9 @@ import numpy as np
 import soundfile as sf
 from pydub import AudioSegment
 from pytube import YouTube
+from pytube.innertube import _default_clients
+
+_default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
 from tqdm import tqdm
 from youtube_transcript_api import NoTranscriptFound, YouTubeTranscriptApi
 
@@ -50,7 +53,10 @@ def extract_segments(audio_outfile, segment_audio_outfiles):
 
 
 def download_audio(url, audio_outfile):
-    yt = YouTube(url)
+    yt = YouTube(url,
+                use_oauth=True,
+                allow_oauth_cache=True
+                )
 
     # download the highest quality audio stream available in mp3 format
     audio = yt.streams.filter(only_audio=True).first()
@@ -158,6 +164,7 @@ def synthesize_segment(
     # Segmenting
     segments = group(transcript, seg_length)
     original_num_segments = len(segments)
+
     if num_segments_per_video and num_segments_per_video < len(segments):
         indices = (
             np.random.choice(len(segments), num_segments_per_video, replace=False)

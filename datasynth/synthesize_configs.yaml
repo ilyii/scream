@@ -1,12 +1,12 @@
 
 num_workers: 4
-source: channel_videos\germania.txt
+source: channel_videos\funk-misc.txt
 destination: D:\Database\s2t-yt\source
 seg_length: 10
-num_segments_per_video: 10
+num_segments_per_video: 20
 do_shuffle_segments: true
 allow_autotranscript: true
 download: true
-delete_full_audio_after_segmentation: false
-skip_existing: true
+delete_full_audio_after_segmentation: true
+skip_existing: false
 language: "de"
