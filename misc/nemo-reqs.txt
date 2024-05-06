@@ -1,0 +1,14 @@
+Cython
+nemo_toolkit
+pytorch_lightning
+hydra-core
+librosa
+transformers
+sentencepiece
+inflect
+webdataset
+lhotse
+pyannote.audio
+editdistance
+jiwer
+cuda-python>=12.3
