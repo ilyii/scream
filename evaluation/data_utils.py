@@ -5,10 +5,11 @@ from collections import Counter, defaultdict
 
 import numpy as np
 import pandas as pd
+import torchaudio as ta
 from torch.utils.data import DataLoader, Dataset
 
 
-def data_to_df(_path):
+def yt_data_to_df(_path):
     # _path must be a directory containing video directories created by the synthesize.py script
     # Each video directory [vid] contains the following directories (+) and files (-):
     # + audios (contains the full audio file as mp3)
@@ -89,12 +90,45 @@ def data_to_df(_path):
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
+    def __init__(
+        self,
+        df,
+        processor,
+        processor_args,
+        target_sr=16000,
+    ):
+        self.audio_file_paths = df["segment_path"]
+        self.transcript_paths = df["transcript_path"]
+        self.processor = processor
+        self.processor_args = processor_args
+        self.target_sr = target_sr
 
     def __len__(self):
-        return len(self.data)
+        return len(self.audio_file_paths)
 
     def __getitem__(self, idx):
-        return self.data[idx], self.labels[idx]
+        audio_path = self.audio_file_paths[idx]
+        transcript_path = self.transcript_paths[idx]
+
+        # Load audio
+        waveform, sample_rate = ta.load(audio_path)
+        if sample_rate != self.target_sr:
+            waveform = ta.transforms.Resample(orig_freq=sample_rate, new_freq=self.target_sr)(waveform)
+        # convert to mono if necessary
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+        waveform = waveform.squeeze(0)
+
+        # Load transcript
+        with open(transcript_path, "r", encoding="utf-8") as f:
+            transcript = f.read().strip()
+
+        # Process audio and transcript
+        input_features = self.processor(waveform, **self.processor_args).input_features
+
+        return {
+            "input_features": input_features,
+            "labels": self.processor.tokenizer(transcript)["input_ids"],
+            "audio_path": audio_path,
+            "transcript": transcript,
+        }
