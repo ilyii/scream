@@ -2,6 +2,7 @@
 **data/
 *.pt
 *.pth
+cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
