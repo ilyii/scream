@@ -1,8 +1,16 @@
+import argparse
 import os
 from pathlib import Path
 import shutil
 import random
 import pandas as pd
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+import utils
+
+print("Imported utils from:", os.path.abspath(utils.__file__))
 
 def create_dataset(root_folder, audio_paths, transcript_files, output_dir, splits: list=[0.8, 0.1, 0.1]):
     
@@ -106,23 +114,29 @@ def split_data(folder_path, train_percentage, val_percentage, test_percentage):
             audio_file = metadata_df.iloc[i]['file_name']
             shutil.copy(os.path.join(train_folder, audio_file), split_folder)
 
+def main(opt):
+    audio_files, transcript_files = load_audio_and_transcripts(opt.root_dir)
+    assert len(audio_files) == len(transcript_files), f"Number of audio files ({len(audio_files)}) and transcript files ({len(transcript_files)}) do not match."
 
+    create_dataset(opt.root_dir, audio_files, transcript_files, opt.output_dir, opt.splits)
+
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Create a dataset from audio files and their corresponding transcriptions.")
+    parser.add_argument("--root_dir", "-r", type=str, required=True, help="Path to the root folder containing the audio files and their transcriptions.")
+    parser.add_argument("--output_dir", "-o", type=str, required=True, help="Path to the output folder.")
+    parser.add_argument("--splits", "-s", type=int, nargs='+', default=[0.8, 0.1, 0.1], help="Percentage of data to be used for training, validation and testing.")
+    args = parser.parse_args()
+    return utils.DotDict(args)
 
 if __name__ == "__main__":
     """
-    This script is used to create a dataset from audio files and their corresponding transcriptions.
+    This script is used to create a HuggingFace dataset from audio files and their corresponding transcriptions.
 
     audio_paths: list of paths to audio files
     transcript_txts: list of transcription files corresponding to the audio files
     
     """
-
-    root_folder = r"D:\Database\s2t-yt\source" 
-    audio_files, transcript_files = load_audio_and_transcripts(root_folder)
-
-    assert len(audio_files) == len(transcript_files), f"Number of audio files ({len(audio_files)}) and transcript files ({len(transcript_files)}) do not match."
-
-    splits = [0.8, 0.1, 0.1]
-    root = r'D:\Database\s2t-yt\dataset'
-    output_folder = r'D:\Database\s2t-yt'
-    create_dataset(root, audio_files, transcript_files, output_folder, splits)
+    opt = get_args()
+    main(opt)
