@@ -51,12 +51,14 @@ def _normalize_text(text: str) -> List[str]:
     # replace all words in brackets (), [] with empty string
     # this is useful for removing youtube specific information like [Music]
     text = re.sub(r"\(.*?\)", "", text)
-    text = re.sub(r"\[.*?\]", "", text)
 
-    # remove special characters and keep spaces
+    # num to words
     text = re.sub(r"\s([0-9]+)\s", _to_words, text)
+    # transform umlauts
     text = _transform_umlauts(text)
-    text = re.sub(r"[^a-z0-9\s]", "", text)
+    # remove special characters (to whitespace, then strip whitespace, then remove double whitespace)
+    # this is because things like: "we-are" should be treated as "we are"
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = text.strip().replace("  ", " ")
     return text.split()
 

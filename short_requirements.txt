@@ -10,6 +10,7 @@ icecream
 ### General
 tqdm
 pandas
+pandarallel
 numpy
 matplotlib
 jupyter
@@ -29,6 +30,8 @@ transformers
 torch_lr_finder
 torch_audiomentations
 openai-whisper
+whisperx
+accelerate
 editdistance
 num2words
 sentencepiece
