@@ -2,6 +2,8 @@
 **data/
 *.pt
 *.pth
+.*/
+models/
 cache/
 
 # Byte-compiled / optimized / DLL files

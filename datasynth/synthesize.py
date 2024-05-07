@@ -1,17 +1,17 @@
 import argparse
-import json
 import math
 import os
 import re
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import librosa
 import numpy as np
 import soundfile as sf
-import yt_dlp
 from pydub import AudioSegment
 from pytube import YouTube
+from pytube.innertube import _default_clients
+
+_default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
 from tqdm import tqdm
 from youtube_transcript_api import NoTranscriptFound, YouTubeTranscriptApi
 
@@ -53,7 +53,10 @@ def extract_segments(audio_outfile, segment_audio_outfiles):
 
 
 def download_audio(url, audio_outfile):
-    yt = YouTube(url)
+    yt = YouTube(url,
+                use_oauth=True,
+                allow_oauth_cache=True
+                )
 
     # download the highest quality audio stream available in mp3 format
     audio = yt.streams.filter(only_audio=True).first()
@@ -110,7 +113,7 @@ def group(transcript, target_seg_length=10):
 
 def synthesize_segment(
     video_id,
-    lang,
+    language,
     destination,
     seg_length,
     num_segments_per_video,
@@ -119,7 +122,6 @@ def synthesize_segment(
     download,
     delete_full_audio_after_segmentation,
     skip_existing,
-    language,
 ):
     output_folder = os.path.join(destination, video_id)
     audio_folder = os.path.join(output_folder, "audios")
@@ -153,7 +155,7 @@ def synthesize_segment(
         (False, True): 4,  # Any language, generated
     }
 
-    transcripts.sort(key=lambda t: priority_map.get((t["language"] == lang, t["is_generated"]), float("inf")))
+    transcripts.sort(key=lambda t: priority_map.get((t["language"] == language, t["is_generated"]), float("inf")))
     transcript = transcripts[0]
     transcript["duration"] = transcript["text"][-1]["start"] + transcript["text"][-1]["duration"]
     transcript = recalculate_durations(transcript)
@@ -162,6 +164,7 @@ def synthesize_segment(
     # Segmenting
     segments = group(transcript, seg_length)
     original_num_segments = len(segments)
+
     if num_segments_per_video and num_segments_per_video < len(segments):
         indices = (
             np.random.choice(len(segments), num_segments_per_video, replace=False)
@@ -174,6 +177,11 @@ def synthesize_segment(
     # collect segment audios to just load the full audio once
     segment_audio_outfiles = []
     for i, segment in enumerate(segments):
+        segment_transcript_outfile = os.path.join(transcript_folder, f"segment_{i:02}.txt")
+        with open(segment_transcript_outfile, "w", encoding="utf-8") as f:
+            if segment["text"].strip() == "":
+                continue
+            f.write(segment["text"])
         segment_audio_outfile = os.path.join(segment_folder, f"segment_{i:02}.mp3")
         segment_audio_outfiles.append(
             {
@@ -183,10 +191,10 @@ def synthesize_segment(
             }
         )
 
-        segment_transcript_outfile = os.path.join(transcript_folder, f"segment_{i:02}.txt")
+        
 
-        with open(segment_transcript_outfile, "w", encoding="utf-8") as f:
-            f.write(segment["text"])
+
+            
 
     # extract segments
     extract_segments(audio_outfile, segment_audio_outfiles)
@@ -223,6 +231,7 @@ def synthesize(
     delete_full_audio_after_segmentation: bool = False,
     skip_existing: bool = True,
     language: str = "en",
+    multithreading: bool = False,
 ):
     if isinstance(source, str) and os.path.exists(source):
         with open(source, "r") as f:
@@ -236,25 +245,52 @@ def synthesize(
         print(f"Creating directory: {destination}")
         os.makedirs(destination)
 
-    with tqdm(total=len(video_ids), desc="Processing URLs") as pbar, ThreadPoolExecutor(
-        max_workers=num_workers
-    ) as executor:
-        futures = []
-        for video_id in video_ids:
-            try:
-                video_id, lang = video_id.split(",")
-            except ValueError:
-                lang = language
+    with tqdm(total=len(video_ids), desc="Processing URLs") as pbar:
+        if multithreading:
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                futures = []
+                for video_id in video_ids:
+                    try:
+                        video_id, lang = video_id.split(",")
+                    except ValueError:
+                        lang = language
 
-            if not re.match(VID, video_id):
-                print(f"Invalid VID: {video_id}")
-                continue
+                    if not re.match(VID, video_id):
+                        print(f"Invalid VID: {video_id}")
+                        continue
 
-            futures.append(
-                executor.submit(
-                    synthesize_segment,
+                    futures.append(
+                        executor.submit(
+                            synthesize_segment,
+                            video_id,
+                            language,
+                            destination,
+                            seg_length,
+                            num_segments_per_video,
+                            do_shuffle_segments,
+                            allow_autotranscript,
+                            download,
+                            delete_full_audio_after_segmentation,
+                            skip_existing,
+                        )
+                    )
+
+                for future in as_completed(futures):
+                    pbar.update(1)
+        else:
+            for video_id in video_ids:
+                try:
+                    video_id, lang = video_id.split(",")
+                except ValueError:
+                    lang = language
+
+                if not re.match(VID, video_id):
+                    print(f"Invalid VID: {video_id}")
+                    continue
+
+                synthesize_segment(
                     video_id,
-                    lang,
+                    language,
                     destination,
                     seg_length,
                     num_segments_per_video,
@@ -263,13 +299,8 @@ def synthesize(
                     download,
                     delete_full_audio_after_segmentation,
                     skip_existing,
-                    language,
                 )
-            )
-
-        for future in as_completed(futures):
-            pbar.update(1)
-
+                pbar.update(1)
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -277,14 +308,20 @@ if __name__ == "__main__":
         "-cp" "--cf_path",
         required=False,
         help="Path to the configuration file",
-        default="datasynth/synthesize_configs.json",
+        default="datasynth/synthesize_configs.yaml",
     )
     args = ap.parse_args()
 
     if not os.path.exists(args.cp__cf_path):
         raise FileNotFoundError(f"Configuration file not found: {args.cp__cf_path}")
 
-    with open(args.cp__cf_path, "r") as f:
-        config = json.load(f)
+    if args.cp__cf_path.endswith(".json"):
+        with open(args.cp__cf_path, "r") as f:
+            import json
+            config = json.load(f)
+    elif args.cp__cf_path.endswith(".yaml"):
+        import yaml
+        with open(args.cp__cf_path, "r") as f:
+            config = yaml.safe_load(f)
 
     synthesize(**config)
