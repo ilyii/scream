@@ -53,13 +53,15 @@ def extract_segments(audio_outfile, segment_audio_outfiles):
 
 
 def download_audio(url, audio_outfile):
-    yt = YouTube(url,
-                use_oauth=True,
-                allow_oauth_cache=True
-                )
+    # IMPORTANT: https://stackoverflow.com/a/70777385
+    yt = YouTube(url, use_oauth=True, allow_oauth_cache=True)
 
     # download the highest quality audio stream available in mp3 format
-    audio = yt.streams.filter(only_audio=True).first()
+    try:
+        audio = yt.streams.filter(only_audio=True).first()
+    except Exception as e:
+        print(f"{e}: No audio stream found for {url}")
+        return -1
     audio_name = audio_outfile.split(".")[0]
     audio_dir = os.path.dirname(audio_outfile)
     downloaded_path = audio.download(audio_dir, filename=audio_name, skip_existing=True)
@@ -69,6 +71,7 @@ def download_audio(url, audio_outfile):
     audio.export(base + ".mp3", format="mp3")
 
     os.remove(downloaded_path)
+    return 0
 
 
 def recalculate_durations(transcript):
@@ -111,6 +114,17 @@ def group(transcript, target_seg_length=10):
     return segments
 
 
+def delete_video_files(output_folder):
+    # Delete all files in the output folder and the folder itself
+    if os.path.exists(output_folder):
+        for root, dirs, files in os.walk(output_folder):
+            for file in files:
+                os.remove(os.path.join(root, file))
+            for dir in dirs:
+                os.rmdir(os.path.join(root, dir))
+        os.rmdir(output_folder)
+
+
 def synthesize_segment(
     video_id,
     language,
@@ -139,7 +153,11 @@ def synthesize_segment(
     url = f"https://www.youtube.com/watch?v={video_id}"
 
     if download:
-        download_audio(url, audio_outfile)
+        success = download_audio(url, audio_outfile)
+        if success == -1:
+            # If the audio download fails, delete the video files and return
+            delete_video_files(output_folder)
+            return
 
     # Transcript
     transcripts = get_transcript(video_id, allow_autotranscript)
@@ -191,11 +209,6 @@ def synthesize_segment(
             }
         )
 
-        
-
-
-            
-
     # extract segments
     extract_segments(audio_outfile, segment_audio_outfiles)
 
@@ -230,8 +243,7 @@ def synthesize(
     download: bool = True,
     delete_full_audio_after_segmentation: bool = False,
     skip_existing: bool = True,
-    language: str = "en",
-    multithreading: bool = False,
+    language: str = "de",
 ):
     if isinstance(source, str) and os.path.exists(source):
         with open(source, "r") as f:
@@ -245,18 +257,21 @@ def synthesize(
         print(f"Creating directory: {destination}")
         os.makedirs(destination)
 
+    do_multithreading = num_workers > 1
+
     with tqdm(total=len(video_ids), desc="Processing URLs") as pbar:
-        if multithreading:
+        if do_multithreading:
             with ThreadPoolExecutor(max_workers=num_workers) as executor:
                 futures = []
                 for video_id in video_ids:
                     try:
-                        video_id, lang = video_id.split(",")
+                        video_id, language = video_id.split(",")
                     except ValueError:
-                        lang = language
+                        pass
 
                     if not re.match(VID, video_id):
                         print(f"Invalid VID: {video_id}")
+                        pbar.update(1)
                         continue
 
                     futures.append(
@@ -280,12 +295,13 @@ def synthesize(
         else:
             for video_id in video_ids:
                 try:
-                    video_id, lang = video_id.split(",")
+                    video_id, language = video_id.split(",")
                 except ValueError:
-                    lang = language
+                    pass
 
                 if not re.match(VID, video_id):
                     print(f"Invalid VID: {video_id}")
+                    pbar.update(1)
                     continue
 
                 synthesize_segment(
@@ -301,6 +317,7 @@ def synthesize(
                     skip_existing,
                 )
                 pbar.update(1)
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -318,9 +335,11 @@ if __name__ == "__main__":
     if args.cp__cf_path.endswith(".json"):
         with open(args.cp__cf_path, "r") as f:
             import json
+
             config = json.load(f)
     elif args.cp__cf_path.endswith(".yaml"):
         import yaml
+
         with open(args.cp__cf_path, "r") as f:
             config = yaml.safe_load(f)
 
