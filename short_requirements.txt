@@ -1,0 +1,42 @@
+### development
+black
+isort
+bandit
+mypy
+pylint
+python-dotenv
+icecream
+
+### General
+tqdm
+pandas
+numpy
+matplotlib
+jupyter
+pyarrow
+fastparquet
+plotly
+
+
+### Audio
+setuptools
+setuptools-rust
+librosa
+soundfile
+
+### Torch and Machine Learning
+transformers
+torch_lr_finder
+torch_audiomentations
+openai-whisper
+editdistance
+num2words
+sentencepiece
+protobuf
+
+### Youtube
+scrapetube
+yt-dlp
+youtube-transcript-api
+pytube
+pydub
