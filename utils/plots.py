@@ -1,13 +1,7 @@
-
-
-
-
-
 import math
 from matplotlib import pyplot as plt
 import numpy as np
 import torch
-from pytube import YouTube
 
 
 def print_stats(waveform, sample_rate=None, src=None):
