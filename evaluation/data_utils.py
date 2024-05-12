@@ -5,10 +5,21 @@ from collections import Counter, defaultdict
 
 import numpy as np
 import pandas as pd
+import torchaudio as ta
+from pandarallel import pandarallel
 from torch.utils.data import DataLoader, Dataset
 
 
-def data_to_df(_path):
+def validate_audio_file(audio_file):
+    try:
+        ta.info(audio_file)
+        return True
+    except Exception as e:
+        print(f"Error in file {audio_file}: {e}")
+        return False
+
+
+def yt_data_to_df(_path, do_load_transcripts=True, do_validate_audio_files=True):
     # _path must be a directory containing video directories created by the synthesize.py script
     # Each video directory [vid] contains the following directories (+) and files (-):
     # + audios (contains the full audio file as mp3)
@@ -58,7 +69,8 @@ def data_to_df(_path):
         video_data["language"].append(info_dict["Language"])
 
         # 3. boolean if transcription is generated (info[3] = "Is generated: [True/False]")
-        video_data["is_generated"].append(info_dict["Is generated"])
+        is_generated = info_dict["Is generated"] == "True"
+        video_data["is_generated"].append(is_generated)
 
         # 4. Number of segments (info[6] = "Number of segments after filtering: [N]")
         num_segments = int(info_dict["Number of segments after filtering"])
@@ -66,7 +78,11 @@ def data_to_df(_path):
 
         # 5. Segment durations (info[8] = "Segment durations: [duration]") -> list of floats
         # video_data["segment_durations"].append(info_dict["Segment durations"])
-        segment_durations = literal_eval(info_dict["Segment durations"])
+        try:
+            segment_durations = literal_eval(info_dict["Segment durations"])
+        except Exception as e:
+            print(f"Error in video {vid}: {e}\n{info_dict['Segment durations']}")
+            segment_durations = [0.0] * num_segments
         video_data["segment_durations"].append(segment_durations)
 
         # Now save the segment data
@@ -85,16 +101,98 @@ def data_to_df(_path):
 
     video_df = pd.DataFrame(video_data)
     segment_df = pd.DataFrame(segment_data)
-    return video_df, segment_df
+
+    # load transcript texts
+    if do_load_transcripts:
+        pandarallel.initialize(progress_bar=True)
+        segment_df["transcript"] = segment_df["transcript_path"].parallel_apply(
+            lambda x: open(x, "r", encoding="utf-8").read().strip()
+        )
+
+    # validate audio files
+    if do_validate_audio_files:
+        pandarallel.initialize(progress_bar=True)
+        segment_df["valid_audio"] = segment_df["segment_path"].parallel_apply(validate_audio_file)
+
+    yt_df = video_df.merge(segment_df, on="video_id", how="inner")
+    return yt_df, video_df, segment_df
+
+
+def filter_yt_df(
+    df,
+    min_segment_length=None,
+    max_segment_length=None,
+    language=None,
+    use_auto_generated=None,
+    min_words=None,
+    max_words=None,
+):
+    # Filter segments by duration
+    if min_segment_length is not None:
+        df = df[df["segment_duration"] >= min_segment_length]
+    if max_segment_length is not None:
+        df = df[df["segment_duration"] <= max_segment_length]
+
+    # Filter by language
+    if language is not None:
+        df = df[df["language"] == language]
+
+    # Filter by auto-generated transcripts
+    if use_auto_generated is not None:
+        df = df[df["is_generated"] == use_auto_generated]
+
+    # Filter by number of words
+    if "transcript" in df.columns:
+        df["num_words"] = df["transcript"].apply(lambda x: len(re.findall(r"\b\w+\b", x)))
+
+    if min_words is not None and "num_words" in df.columns:
+        df = df[(df["num_words"] >= min_words)]
+
+    if max_words is not None and "num_words" in df.columns:
+        df = df[(df["num_words"] <= max_words)]
+
+    return df.reset_index(drop=True)
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
+    def __init__(
+        self,
+        df,
+        processor,
+        processor_args,
+        target_sr=16000,
+    ):
+        self.audio_file_paths = df["segment_path"]
+        self.transcripts = df["transcript"]
+        self.processor = processor
+        self.processor_args = processor_args
+        self.target_sr = target_sr
 
     def __len__(self):
-        return len(self.data)
+        return len(self.audio_file_paths)
 
     def __getitem__(self, idx):
-        return self.data[idx], self.labels[idx]
+        audio_path = self.audio_file_paths[idx]
+        transcript = self.transcripts[idx]
+
+        # Load audio
+        waveform, sample_rate = ta.load(audio_path)
+        if sample_rate != self.target_sr:
+            waveform = ta.transforms.Resample(orig_freq=sample_rate, new_freq=self.target_sr)(waveform)
+        # convert to mono if necessary
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+        waveform = waveform.squeeze(0)
+
+        # Process audio and transcript
+        try:
+            input_features = self.processor(waveform, **self.processor_args).input_features
+        except Exception as e:
+            input_features = self.processor(waveform, **self.processor_args).input_values
+
+        return {
+            "input_features": input_features,
+            "labels": self.processor.tokenizer(transcript)["input_ids"],
+            "audio_path": audio_path,
+            "transcript": transcript,
+        }
