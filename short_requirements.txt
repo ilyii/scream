@@ -29,8 +29,10 @@ soundfile
 transformers
 torch_lr_finder
 torch_audiomentations
+torchmetrics
 openai-whisper
 whisperx
+faster-whisper
 accelerate
 editdistance
 num2words
