@@ -30,6 +30,8 @@ transformers
 torch_lr_finder
 torch_audiomentations
 torchmetrics
+openai
+langchain
 openai-whisper
 whisperx
 faster-whisper
