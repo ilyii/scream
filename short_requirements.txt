@@ -47,3 +47,6 @@ yt-dlp
 youtube-transcript-api
 pytube
 pydub
+
+### Telegram
+pyTelegramBotAPI
