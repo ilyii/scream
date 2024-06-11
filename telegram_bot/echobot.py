@@ -6,6 +6,7 @@ sys.path.append(cur_dir)
 import telebot
 from dotenv import load_dotenv
 from pydub import AudioSegment
+from summarize_utils import load_model_summarize, summarize_transcript
 from transcribe_utils import load_model, transcribe_voice
 
 load_dotenv()
@@ -76,8 +77,13 @@ def summarize_voice(message):
 # callback function for all voice messages
 @bot.message_handler(content_types=["voice"])
 def voice_handler(message):
-    first_name = message.from_user.first_name
-    bot.send_message(message.chat.id, f"Hey {first_name}, you little freak! I can't transcribe voice messages yet.")
+    # first_name = message.from_user.first_name
+    # bot.send_message(message.chat.id, f"Hey {first_name}, you little freak! I can't transcribe voice messages yet.")
+    bot_transcribe_voice(message)
+
+
+def bot_summarize_transcript(transcript):
+    return "Sorry, I can't summarize the transcript yet."
 
 
 # callback function
@@ -127,12 +133,14 @@ def bot_transcribe_voice(message):
     if transcript == "" or transcript is None or transcript.isspace():
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't transcribe the voice message.")
         return
-    ret_msg = f"Hey {first_name}, here's the transcription of the voice message:\n{transcript}"
+    summarization = summarize_transcript(transcript)
+    ret_msg = f"Hey {first_name}, here's the transcription of the voice message:\n{transcript}\n---\n{summarization}"
     bot.send_message(message.chat.id, ret_msg)
 
 
 if __name__ == "__main__":
     load_model(cache_dir)
+    load_model_summarize()
     print("Bot is running!")
     bot.infinity_polling()
     print("Bot is stopped!")
