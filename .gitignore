@@ -4,6 +4,9 @@
 *.pth
 models/
 cache/
+.nemo
+.whisper
+*.npy
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
