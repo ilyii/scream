@@ -40,78 +40,41 @@ def send_help(message):
     bot.send_message(message.chat.id, response_text, parse_mode="Markdown")
 
 
-@bot.message_handler(commands=["summarize", "s"])
-def summarize_voice(message):
-    bot.send_message(message.chat.id, "Sorry, I can't summarize voice messages yet.")
-
-
-# @bot.message_handler(commands=["horoscope"])
-# def sign_handler(message):
-#     text = "What's your zodiac sign?\nChoose one: *Aries*, *Taurus*, *Gemini*, *Cancer,* *Leo*, *Virgo*, *Libra*, *Scorpio*, *Sagittarius*, *Capricorn*, *Aquarius*, and *Pisces*."
-#     sent_msg = bot.send_message(message.chat.id, text, parse_mode="Markdown")
-#     bot.register_next_step_handler(sent_msg, day_handler)
-
-
-# def day_handler(message):
-#     sign = message.text
-#     text = (
-#         "What day do you want to know?\nChoose one: *TODAY*, *TOMORROW*, *YESTERDAY*, or a date in format YYYY-MM-DD."
-#     )
-#     sent_msg = bot.send_message(message.chat.id, text, parse_mode="Markdown")
-#     bot.register_next_step_handler(sent_msg, fetch_horoscope, sign.capitalize())
-
-
-# def fetch_horoscope(message, sign):
-#     day = message.text
-#     horoscope_message = "Haha, I'm sorry, I don't have that information."
-#     bot.send_message(message.chat.id, "Here's your horoscope!")
-#     bot.send_message(message.chat.id, horoscope_message, parse_mode="Markdown")
-
-
-# @bot.message_handler(func=lambda msg: True)
-# def echo_all(message):
-#     is_reply = message.reply_to_message is not None
-#     bot.reply_to(message, f"Hey, you said: {message.text} & is_reply: {is_reply}")
+# @bot.message_handler(commands=["summarize", "s"])
+# def summarize_voice(message):
+#     bot.send_message(message.chat.id, "Sorry, I can't summarize voice messages yet.")
 
 
 # callback function for all voice messages
 @bot.message_handler(content_types=["voice"])
 def voice_handler(message):
-    # first_name = message.from_user.first_name
-    # bot.send_message(message.chat.id, f"Hey {first_name}, you little freak! I can't transcribe voice messages yet.")
-    bot_transcribe_voice(message)
+    first_name = message.from_user.first_name
+    bot.send_message(message.chat.id, f"Hey {first_name}, there's a voice message. Please reply to it with a command.")
 
 
-def bot_summarize_transcript(transcript):
-    return "Sorry, I can't summarize the transcript yet."
-
-
-# callback function
-# for all replied voice messages with /transcribe command
-@bot.message_handler(commands=["transcribe", "t"])
-def bot_transcribe_voice(message):
+def check_for_valid_message(message):
     first_name = message.from_user.first_name
 
-    # check if the message is a reply
     if not message.reply_to_message:
         print("No reply message found.")
         bot.send_message(message.chat.id, f"Hey {first_name}, please reply to a voice message.")
-        return
+        return False
 
     if message.reply_to_message.content_type != "voice":
         print("Replied message is not a voice message.")
         bot.send_message(message.chat.id, f"Hey {first_name}, please reply to a voice message.")
-        return
+        return False
 
     # check if the voice message is from the bot itself
     if message.reply_to_message.from_user.id == bot.get_me().id:
         bot.send_message(message.chat.id, f"Hey {first_name}, I can't transcribe my own voice messages.")
-        return
+        return False
 
+    return True
+
+
+def save_audio(message):
     voice_dir = os.path.join(cache_dir, "voice_messages")
-    if not os.path.exists(voice_dir):
-        os.makedirs(voice_dir)
-
     voice = bot.get_file(message.reply_to_message.voice.file_id)
     ogg_path = os.path.join(voice_dir, f"{voice.file_id}.ogg")
     wav_path = ogg_path.replace(".ogg", ".wav")
@@ -129,12 +92,50 @@ def bot_transcribe_voice(message):
         ogg_audio.export(wav_path, format="wav")
         os.remove(ogg_path)
 
+    return wav_path
+
+
+def create_transcript(message):
+    wav_path = save_audio(message)
     transcript = transcribe_voice(wav_path)
+    return transcript
+
+
+@bot.message_handler(commands=["summarize", "s"])
+def bot_summarize_transcript(message):
+    first_name = message.from_user.first_name
+
+    if not check_for_valid_message(message):
+        return
+
+    transcript = create_transcript(message)
     if transcript == "" or transcript is None or transcript.isspace():
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't transcribe the voice message.")
         return
-    summarization = summarize_transcript(transcript)
-    ret_msg = f"Hey {first_name}, here's the transcription of the voice message:\n{transcript}\n---\n{summarization}"
+
+    summary = summarize_transcript(transcript)
+    if summary == "" or summary is None or summary.isspace():
+        bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't summarize the voice message.")
+        return
+
+    ret_msg = f"Hey {first_name}, here's the summary of the voice message:\n{summary}"
+    bot.send_message(message.chat.id, ret_msg)
+
+
+# callback function
+# for all replied voice messages with /transcribe command
+@bot.message_handler(commands=["transcribe", "t"])
+def bot_transcribe_voice(message):
+    first_name = message.from_user.first_name
+
+    if not check_for_valid_message(message):
+        return
+
+    transcript = create_transcript(message)
+    if transcript == "" or transcript is None or transcript.isspace():
+        bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't transcribe the voice message.")
+        return
+    ret_msg = f"Hey {first_name}, here's the transcription of the voice message:\n{transcript}"
     bot.send_message(message.chat.id, ret_msg)
 
 

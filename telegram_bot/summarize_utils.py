@@ -45,7 +45,7 @@ summarize_model = None
 def load_model_summarize():
     global summarize_model
     # summarize_model = ChatPerplexity(temperature=0, model=model_name, api_key=pplx_api_key)
-    summarize_model = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
+    summarize_model = OpenAI(base_url="http://localhost:5000/v1", api_key="lm-studio")
 
 
 def summarize_transcript(transcript):
@@ -64,7 +64,7 @@ def summarize_transcript(transcript):
             {"role": "system", "content": system},
             {"role": "user", "content": human.format(text=transcript)},
         ],
-        temperature=0.2,
+        temperature=0.01,
     )
 
     return response.choices[0].message.content
