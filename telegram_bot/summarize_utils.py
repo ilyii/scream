@@ -13,30 +13,22 @@ from openai import OpenAI
 load_dotenv()
 
 pplx_api_key = os.getenv("PPLX_API_KEY")
-# model_name = "llama-3-8b-instruct"
-model_name = "mixtral-8x7b-instruct"
+model_name = "llama-3-8b-instruct"
+# model_name = "mixtral-8x7b-instruct"
 
 system = """
-Fasse das unten stehende Audiotranskript zusammen. 
-Wenn das Transkript mit den angegebenen Informationen nicht zusammengefasst werden kann, antworte mit "Kann nicht zusammengefasst werden!".
-
-Kontext: Sie sind ein Spezialist, der damit beauftragt ist, Transkripte von Audionachrichten zusammenzufassen. 
-Dein Ziel ist es immer, präzise und genaue Zusammenfassungen des Transkripts zu erstellen.
-Du solltest jedoch keine Informationen hinzufügen, die nicht in dem Transkript enthalten sind.
-Die Zusammenfassung sollte aus wenigen Sätzen bestehen, die die wichtigsten Punkte der Audionachricht wiedergeben.
-Ignoriere Rechtschreibfehler oder Grammatikfehler in der Audionachricht und verbessere diese in der Zusammenfassung.
-Erwähne nicht, dass es sich um eine Zusammenfassung handelt oder dass du ein Transkript zusammenfasst.
-Fasse es aus der Perspektive des Sprechers zusammen.
-
+- Du bist ein Spezialist für die Erstellung präziser Zusammenfassungen von Audionachrichten.
+- Deine Aufgabe ist es, die Kernaussagen der Nachricht in wenigen Sätzen wiederzugeben, ohne zusätzliche Informationen hinzuzufügen.
+- Erstelle die Zusammenfassung aus der Perspektive des Sprechers, also aus der selben Perspektive wie im Transkript gegeben!
+- Erwähne nicht, dass es sich um eine Zusammenfassung handelt oder dass du ein KI-Modell bist.
+- Die Zusammenfassung soll Stichpunkte enthalten, die die wichtigsten Punkte der Nachricht hervorheben.
 """
 
 human = """
 --- Bitte fasse dieses Audiotranskript in deutsch zusammen:
 
 {text}
----
-
-Zusammenfassung: 
+Zusammenfassung:
 """
 
 summarize_model = None
@@ -58,13 +50,13 @@ def summarize_transcript(transcript):
     # response = chain.invoke({"text": f"{transcript}"}).content
     # return response
     response = summarize_model.chat.completions.create(
-        # model="LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF",
-        model="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+        model="LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF",
+        # model="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": human.format(text=transcript)},
         ],
-        temperature=0.01,
+        temperature=0.1,
     )
 
     return response.choices[0].message.content

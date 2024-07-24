@@ -118,8 +118,8 @@ def bot_summarize_transcript(message):
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't summarize the voice message.")
         return
 
-    ret_msg = f"Hey {first_name}, here's the summary of the voice message:\n{summary}"
-    bot.send_message(message.chat.id, ret_msg)
+    # ret_msg = f"Hey {first_name}, here's the summary of the voice message:\n{summary}"
+    bot.send_message(message.chat.id, summary)
 
 
 # callback function
