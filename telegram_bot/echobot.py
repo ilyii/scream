@@ -3,6 +3,7 @@ import sys
 
 cur_dir = os.path.dirname(__file__)
 sys.path.append(cur_dir)
+import pandas as pd
 import telebot
 from dotenv import load_dotenv
 from pydub import AudioSegment
@@ -40,18 +41,6 @@ def send_help(message):
     bot.send_message(message.chat.id, response_text, parse_mode="Markdown")
 
 
-# @bot.message_handler(commands=["summarize", "s"])
-# def summarize_voice(message):
-#     bot.send_message(message.chat.id, "Sorry, I can't summarize voice messages yet.")
-
-
-# callback function for all voice messages
-@bot.message_handler(content_types=["voice"])
-def voice_handler(message):
-    first_name = message.from_user.first_name
-    bot.send_message(message.chat.id, f"Hey {first_name}, there's a voice message. Please reply to it with a command.")
-
-
 def check_for_valid_message(message):
     first_name = message.from_user.first_name
 
@@ -73,9 +62,9 @@ def check_for_valid_message(message):
     return True
 
 
-def save_audio(message):
-    voice_dir = os.path.join(cache_dir, "voice_messages")
-    voice = bot.get_file(message.reply_to_message.voice.file_id)
+def save_audio(voice_id, chat_dir):
+    voice_dir = os.path.join(chat_dir, "voice_messages")
+    voice = bot.get_file(voice_id)
     ogg_path = os.path.join(voice_dir, f"{voice.file_id}.ogg")
     wav_path = ogg_path.replace(".ogg", ".wav")
 
@@ -95,10 +84,77 @@ def save_audio(message):
     return wav_path
 
 
-def create_transcript(message):
-    wav_path = save_audio(message)
-    transcript = transcribe_voice(wav_path)
+def save_transcript(voice_id, transcript, chat_dir):
+    transcript_dir = os.path.join(chat_dir, "transcripts")
+    transcript_path = os.path.join(transcript_dir, f"{voice_id}.txt")
+    with open(transcript_path, "w") as file:
+        file.write(transcript)
+
+    return transcript_path
+
+
+def load_transcript(voice_id, chat_dir):
+    transcript_dir = os.path.join(chat_dir, "transcripts")
+    transcript_path = os.path.join(transcript_dir, f"{voice_id}.txt")
+    if not os.path.exists(transcript_path):
+        return None
+
+    with open(transcript_path, "r") as file:
+        transcript = file.read()
+
     return transcript
+
+
+def save_summary(voice_id, summary, chat_dir):
+    summary_dir = os.path.join(chat_dir, "summaries")
+    summary_path = os.path.join(summary_dir, f"{voice_id}.txt")
+    with open(summary_path, "w") as file:
+        file.write(summary)
+
+    return summary_path
+
+
+def load_summary(voice_id, chat_dir):
+    summary_dir = os.path.join(chat_dir, "summaries")
+    summary_path = os.path.join(summary_dir, f"{voice_id}.txt")
+    if not os.path.exists(summary_path):
+        return None
+
+    with open(summary_path, "r") as file:
+        summary = file.read()
+
+    return summary
+
+
+def create_transcript(voice_id, chat_dir):
+    wav_path = save_audio(voice_id, chat_dir)
+    transcript = load_transcript(voice_id, chat_dir)
+    if transcript is None:
+        transcript = transcribe_voice(wav_path)
+    else:
+        return transcript
+    _ = save_transcript(voice_id, transcript, chat_dir)
+    return transcript
+
+
+def create_summary(voice_id, transcript, chat_dir):
+    summary = load_summary(voice_id, chat_dir)
+    if summary is None:
+        summary = summarize_transcript(transcript)
+    else:
+        return summary
+    _ = save_summary(voice_id, summary, chat_dir)
+    return summary
+
+
+def create_chat_dir(chat_id):
+    chat_dir = os.path.join(cache_dir, "chats", str(chat_id))
+    os.makedirs(chat_dir, exist_ok=True)
+    # create some subdirectories
+    os.makedirs(os.path.join(chat_dir, "voice_messages"), exist_ok=True)
+    os.makedirs(os.path.join(chat_dir, "transcripts"), exist_ok=True)
+    os.makedirs(os.path.join(chat_dir, "summaries"), exist_ok=True)
+    return chat_dir
 
 
 @bot.message_handler(commands=["summarize", "s"])
@@ -107,19 +163,21 @@ def bot_summarize_transcript(message):
 
     if not check_for_valid_message(message):
         return
+    chat_dir = create_chat_dir(message.chat.id)
+    voice_id = message.reply_to_message.voice.file_id
 
-    transcript = create_transcript(message)
+    transcript = create_transcript(voice_id, chat_dir)
     if transcript == "" or transcript is None or transcript.isspace():
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't transcribe the voice message.")
         return
 
-    summary = summarize_transcript(transcript)
+    summary = create_summary(voice_id, transcript, chat_dir)
     if summary == "" or summary is None or summary.isspace():
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't summarize the voice message.")
         return
 
-    # ret_msg = f"Hey {first_name}, here's the summary of the voice message:\n{summary}"
-    bot.send_message(message.chat.id, summary)
+    markdown_message = f"📃✨*Zusammenfassung*✨📃\n\n{summary}"
+    bot.send_message(message.chat.id, markdown_message, parse_mode="Markdown")
 
 
 # callback function
@@ -130,13 +188,38 @@ def bot_transcribe_voice(message):
 
     if not check_for_valid_message(message):
         return
+    chat_dir = create_chat_dir(message.chat.id)
+    voice_id = message.reply_to_message.voice.file_id
 
-    transcript = create_transcript(message)
+    transcript = create_transcript(voice_id, chat_dir)
     if transcript == "" or transcript is None or transcript.isspace():
         bot.send_message(message.chat.id, f"Hey {first_name}, I couldn't transcribe the voice message.")
         return
-    ret_msg = f"Hey {first_name}, here's the transcription of the voice message:\n{transcript}"
-    bot.send_message(message.chat.id, ret_msg)
+    # ret_msg = f"Hey {first_name}, hier ist das Transkript:\n{transcript}"
+    # bot.send_message(message.chat.id, ret_msg)
+
+    markdown_message = f"🗣️✨*Transkript*✨️🗣️\n\n{transcript}"
+    bot.send_message(message.chat.id, markdown_message, parse_mode="Markdown")
+
+
+@bot.message_handler(content_types=["voice"])
+def all_audio(message):
+    if message.from_user.id == bot.get_me().id:
+        return
+
+    voice_id = message.voice.file_id
+
+    # first_name = message.from_user.first_name
+    chat_dir = create_chat_dir(message.chat.id)
+    transcript = create_transcript(voice_id, chat_dir)
+    if transcript == "" or transcript is None or transcript.isspace():
+        return
+    summarize = create_summary(voice_id, transcript, chat_dir)
+    if summarize == "" or summarize is None or summarize.isspace():
+        return
+
+    print(f"Transcript: {transcript}")
+    print(f"Summary: {summarize}")
 
 
 if __name__ == "__main__":

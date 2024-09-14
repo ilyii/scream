@@ -1,20 +1,12 @@
 import os
-from getpass import getpass
 
-import pandas as pd
 from dotenv import load_dotenv
-from IPython.display import Audio
-from langchain_community.chat_models import ChatPerplexity
 from langchain_core.prompts import ChatPromptTemplate
-
-# Example: reuse your existing OpenAI setup
-from openai import OpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
 
-pplx_api_key = os.getenv("PPLX_API_KEY")
-model_name = "llama-3-8b-instruct"
-# model_name = "mixtral-8x7b-instruct"
+model_name = "gemini-1.5-flash"
 
 system = """
 - Du bist ein Spezialist für die Erstellung präziser Zusammenfassungen von Audionachrichten.
@@ -22,41 +14,39 @@ system = """
 - Erstelle die Zusammenfassung aus der Perspektive des Sprechers, also aus der selben Perspektive wie im Transkript gegeben!
 - Erwähne nicht, dass es sich um eine Zusammenfassung handelt oder dass du ein KI-Modell bist.
 - Die Zusammenfassung soll Stichpunkte enthalten, die die wichtigsten Punkte der Nachricht hervorheben.
+- Die Zusammenfassung soll in deutscher Sprache verfasst sein.
 """
 
-human = """
---- Bitte fasse dieses Audiotranskript in deutsch zusammen:
+user = """
+Das Transkript der Audionachricht lautet:
+{input}
 
-{text}
+---
+
 Zusammenfassung:
 """
+
+prompt = ChatPromptTemplate.from_messages([("system", system), ("human", user)])
 
 summarize_model = None
 
 
 def load_model_summarize():
     global summarize_model
-    # summarize_model = ChatPerplexity(temperature=0, model=model_name, api_key=pplx_api_key)
-    summarize_model = OpenAI(base_url="http://localhost:5000/v1", api_key="lm-studio")
+    summarize_model = ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0.3,
+        max_tokens=512,
+        google_api_key=os.getenv("GEMINI_API_KEY"),
+        timeout=None,
+        max_retries=2,
+    )
 
 
 def summarize_transcript(transcript):
-    # global summarize_model
-    # prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
-    # if summarize_model is None:
-    #     raise ValueError("Model not loaded.")
+    global summarize_model
+    if summarize_model is None:
+        load_model_summarize()
 
-    # chain = prompt | summarize_model
-    # response = chain.invoke({"text": f"{transcript}"}).content
-    # return response
-    response = summarize_model.chat.completions.create(
-        model="LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF",
-        # model="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": human.format(text=transcript)},
-        ],
-        temperature=0.1,
-    )
-
-    return response.choices[0].message.content
+    chain = prompt | summarize_model
+    return chain.invoke({"input": transcript}).content

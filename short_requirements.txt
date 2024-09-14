@@ -50,3 +50,5 @@ pydub
 
 ### Telegram
 pyTelegramBotAPI
+google-generativeai
+langchain-google-genai
