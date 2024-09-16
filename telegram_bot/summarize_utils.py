@@ -17,7 +17,7 @@ system = """
 - Die Zusammenfassung soll in deutscher Sprache verfasst sein.
 """
 
-user = """
+user_single = """
 Das Transkript der Audionachricht lautet:
 {input}
 
@@ -26,8 +26,24 @@ Das Transkript der Audionachricht lautet:
 Zusammenfassung:
 """
 
-prompt = ChatPromptTemplate.from_messages([("system", system), ("human", user)])
+user_multi = """
+Folgend erhälst du mehrere Transkripte von Audionachrichten.
+Fasse die wichtigsten Punkten aus ALLEN Nachrichten zusammen und gib EINE Zusammenfassung zurück.
+Gib unbedingt an, aus welcher Nachricht jeweils die Informationen stammen!!! (z.B. "Nachricht 1: Zusammenfassung Nachricht 1", "Nachricht 2: ...")
+Gib danach aber noch eine allgemeine Zusammenfassung aller Nachrichten an.
 
+---
+
+Transkripte:
+{input}
+
+---
+
+Zusammenfassung:
+"""
+
+prompt_single = ChatPromptTemplate.from_messages([("system", system), ("human", user_single)])
+prompt_multi = ChatPromptTemplate.from_messages([("system", system), ("human", user_multi)])
 summarize_model = None
 
 
@@ -36,17 +52,21 @@ def load_model_summarize():
     summarize_model = ChatGoogleGenerativeAI(
         model=model_name,
         temperature=0.3,
-        max_tokens=512,
+        max_tokens=2048,
         google_api_key=os.getenv("GEMINI_API_KEY"),
         timeout=None,
         max_retries=2,
     )
 
 
-def summarize_transcript(transcript):
+def summarize_transcript(transcript, is_multi=False):
     global summarize_model
     if summarize_model is None:
         load_model_summarize()
 
+    if is_multi:
+        prompt = prompt_multi
+    else:
+        prompt = prompt_single
     chain = prompt | summarize_model
     return chain.invoke({"input": transcript}).content
