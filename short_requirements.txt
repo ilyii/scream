@@ -10,6 +10,7 @@ icecream
 ### General
 tqdm
 pandas
+pandarallel
 numpy
 matplotlib
 jupyter
@@ -28,7 +29,13 @@ soundfile
 transformers
 torch_lr_finder
 torch_audiomentations
+torchmetrics
+openai
+langchain
 openai-whisper
+whisperx
+faster-whisper
+accelerate
 editdistance
 num2words
 sentencepiece
@@ -40,3 +47,8 @@ yt-dlp
 youtube-transcript-api
 pytube
 pydub
+
+### Telegram
+pyTelegramBotAPI
+google-generativeai
+langchain-google-genai
