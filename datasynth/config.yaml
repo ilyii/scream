@@ -1,0 +1,25 @@
+# num_workers: 16
+# source: data/channel_videos/sonnetodsterne.txt
+# destination: D:\Database\2024_STT_test
+# seg_length: 20
+# num_segments_per_video: 15
+# do_shuffle_segments: true
+# allow_autotranscript: true
+# download: true
+# delete_full_audio_after_segmentation: true
+# skip_existing: true
+# language: "de"
+# multiprocessing: false
+
+num_workers: 4                          # Number of threads for concurrent processing
+source: 'video_ids.txt'                  # Path to a file or a list of video IDs to process
+destination: 'output_folder'             # Output folder for processed files
+seg_length: 10                           # Target length of audio segments (in seconds)
+num_segments_per_video: null             # Limit on the number of segments per video (optional)
+do_shuffle_segments: false               # Whether to randomly shuffle segments
+allow_autotranscript: false              # Allow auto-generated transcripts
+download: true                           # Whether to download audio
+delete_full_audio_after_segmentation: false # Whether to delete full audio after segmentation
+skip_existing: true                      # Skip processing of videos that have already been processed
+language: 'en'                           # Preferred transcript language (if available)
+multiprocessing: false                  # Use multiprocessing for downloading and processing

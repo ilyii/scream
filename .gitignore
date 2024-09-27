@@ -7,6 +7,7 @@ cache/
 .nemo
 .whisper
 *.npy
+.archive/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
