@@ -1,7 +1,19 @@
+"""
+Utility functions for managing voice message transcripts and summaries.
+
+This module provides functions for handling voice messages, transcripts, and summaries
+in a Telegram bot context. It includes functionality for file management, data persistence,
+and statistical analysis of chat data.
+"""
+
 import os
+from pathlib import Path
+from typing import Optional, List, Dict, Any
 
 import pandas as pd
 from pydub import AudioSegment
+from pandas.tseries.offsets import DateOffset
+
 from summarize_utils import summarize_transcript
 from transcribe_utils import transcribe_voice
 
@@ -16,7 +28,17 @@ CHAT_META_COLUMNS = [
 ]
 
 
-def check_for_valid_message(bot, message):
+def check_for_valid_message(bot: Any, message: Any) -> bool:
+    """
+    Check if the replied message is a valid voice message.
+
+    Args:
+        bot: The Telegram bot instance.
+        message: The message to check.
+
+    Returns:
+        bool: True if the message is valid, False otherwise.
+    """
     first_name = message.from_user.first_name
 
     if not message.reply_to_message:
@@ -29,7 +51,6 @@ def check_for_valid_message(bot, message):
         bot.send_message(message.chat.id, f"Hey {first_name}, please reply to a voice message.")
         return False
 
-    # check if the voice message is from the bot itself
     if message.reply_to_message.from_user.id == bot.get_me().id:
         bot.send_message(message.chat.id, f"Hey {first_name}, I can't transcribe my own voice messages.")
         return False
@@ -37,177 +58,270 @@ def check_for_valid_message(bot, message):
     return True
 
 
-def save_audio(bot, voice_id, chat_dir):
-    voice_dir = os.path.join(chat_dir, "voice_messages")
+def save_audio(bot: Any, voice_id: str, chat_dir: str) -> str:
+    """
+    Save the audio file from a voice message.
+
+    Args:
+        bot: The Telegram bot instance.
+        voice_id: The ID of the voice message.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        str: The path to the saved WAV file.
+    """
+    voice_dir = Path(chat_dir) / "voice_messages"
+    voice_dir.mkdir(parents=True, exist_ok=True)
+
     voice = bot.get_file(voice_id)
-    ogg_path = os.path.join(voice_dir, f"{voice.file_id}.ogg")
-    wav_path = ogg_path.replace(".ogg", ".wav")
+    wav_path = voice_dir / f"{voice.file_id}.wav"
 
-    if os.path.exists(wav_path):
+    if wav_path.exists():
         print("Voice file already exists.")
-        with open(wav_path, "rb") as file:
-            voice_file = file.read()
-    else:
-        print("Downloading voice file...")
-        voice_file = bot.download_file(voice.file_path)
-        with open(ogg_path, "wb") as file:
-            file.write(voice_file)
-        ogg_audio = AudioSegment.from_ogg(ogg_path)
-        ogg_audio.export(wav_path, format="wav")
-        os.remove(ogg_path)
+        return str(wav_path)
 
-    return wav_path
+    print("Downloading voice file...")
+    voice_file = bot.download_file(voice.file_path)
+    ogg_path = voice_dir / f"{voice.file_id}.ogg"
+
+    with ogg_path.open("wb") as file:
+        file.write(voice_file)
+
+    ogg_audio = AudioSegment.from_ogg(str(ogg_path))
+    ogg_audio.export(str(wav_path), format="wav")
+    ogg_path.unlink()
+
+    return str(wav_path)
 
 
-def save_transcript(voice_id, transcript, chat_dir):
-    transcript_dir = os.path.join(chat_dir, "transcripts")
-    transcript_path = os.path.join(transcript_dir, f"{voice_id}.txt")
-    with open(transcript_path, "w") as file:
+def save_transcript(voice_id: str, transcript: str, chat_dir: str) -> str:
+    """
+    Save the transcript of a voice message.
+
+    Args:
+        voice_id: The ID of the voice message.
+        transcript: The transcript text.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        str: The path to the saved transcript file.
+    """
+    transcript_dir = Path(chat_dir) / "transcripts"
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+    transcript_path = transcript_dir / f"{voice_id}.txt"
+
+    with transcript_path.open("w", encoding="utf-8") as file:
         file.write(transcript)
 
-    return transcript_path
+    return str(transcript_path)
 
 
-def load_transcript(voice_id, chat_dir):
-    transcript_dir = os.path.join(chat_dir, "transcripts")
-    transcript_path = os.path.join(transcript_dir, f"{voice_id}.txt")
-    if not os.path.exists(transcript_path):
+def load_transcript(voice_id: str, chat_dir: str) -> Optional[str]:
+    """
+    Load the transcript of a voice message.
+
+    Args:
+        voice_id: The ID of the voice message.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[str]: The transcript text if it exists, None otherwise.
+    """
+    transcript_path = Path(chat_dir) / "transcripts" / f"{voice_id}.txt"
+
+    if not transcript_path.exists():
         return None
 
-    with open(transcript_path, "r") as file:
-        transcript = file.read()
-
-    return transcript
+    with transcript_path.open("r", encoding="utf-8") as file:
+        return file.read()
 
 
-def save_summary(voice_id, summary, chat_dir):
-    summary_dir = os.path.join(chat_dir, "summaries")
-    summary_path = os.path.join(summary_dir, f"{voice_id}.txt")
-    with open(summary_path, "w") as file:
+def save_summary(voice_id: str, summary: str, chat_dir: str) -> str:
+    """
+    Save the summary of a voice message.
+
+    Args:
+        voice_id: The ID of the voice message.
+        summary: The summary text.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        str: The path to the saved summary file.
+    """
+    summary_dir = Path(chat_dir) / "summaries"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = summary_dir / f"{voice_id}.txt"
+
+    with summary_path.open("w", encoding="utf-8") as file:
         file.write(summary)
 
-    return summary_path
+    return str(summary_path)
 
 
-def load_summary(voice_id, chat_dir):
-    summary_dir = os.path.join(chat_dir, "summaries")
-    summary_path = os.path.join(summary_dir, f"{voice_id}.txt")
-    if not os.path.exists(summary_path):
+def load_summary(voice_id: str, chat_dir: str) -> Optional[str]:
+    """
+    Load the summary of a voice message.
+
+    Args:
+        voice_id: The ID of the voice message.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[str]: The summary text if it exists, None otherwise.
+    """
+    summary_path = Path(chat_dir) / "summaries" / f"{voice_id}.txt"
+
+    if not summary_path.exists():
         return None
 
-    with open(summary_path, "r") as file:
-        summary = file.read()
-
-    return summary
+    with summary_path.open("r", encoding="utf-8") as file:
+        return file.read()
 
 
-def create_transcript(bot, voice_id, chat_dir):
+def create_transcript(bot: Any, voice_id: str, chat_dir: str) -> str:
+    """
+    Create or load a transcript for a voice message.
+
+    Args:
+        bot: The Telegram bot instance.
+        voice_id: The ID of the voice message.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        str: The transcript text.
+    """
     wav_path = save_audio(bot, voice_id, chat_dir)
     transcript = load_transcript(voice_id, chat_dir)
+
     if transcript is None:
         transcript = transcribe_voice(wav_path)
-    else:
-        return transcript
-    _ = save_transcript(voice_id, transcript, chat_dir)
-    _ = save_to_chat_meta(chat_dir, voice_id, transcript=transcript)
+        save_transcript(voice_id, transcript, chat_dir)
+        save_to_chat_meta(chat_dir, voice_id, transcript=transcript)
+
     return transcript
 
 
-def create_summary(voice_id, transcript, chat_dir):
+def create_summary(voice_id: str, transcript: str, chat_dir: str) -> str:
+    """
+    Create or load a summary for a voice message.
+
+    Args:
+        voice_id: The ID of the voice message.
+        transcript: The transcript text.
+        chat_dir: The directory for the chat.
+
+    Returns:
+        str: The summary text.
+    """
     summary = load_summary(voice_id, chat_dir)
+
     if summary is None:
         summary = summarize_transcript(transcript)
-    else:
-        return summary
-    _ = save_summary(voice_id, summary, chat_dir)
-    _ = save_to_chat_meta(chat_dir, voice_id, transcript=transcript, summary=summary)
+        save_summary(voice_id, summary, chat_dir)
+        save_to_chat_meta(chat_dir, voice_id, transcript=transcript, summary=summary)
+
     return summary
 
 
-def create_chat_dir(cache_dir, chat_id):
-    chat_dir = os.path.join(cache_dir, "chats", str(chat_id))
-    os.makedirs(chat_dir, exist_ok=True)
-    # create some subdirectories
-    os.makedirs(os.path.join(chat_dir, "voice_messages"), exist_ok=True)
-    os.makedirs(os.path.join(chat_dir, "transcripts"), exist_ok=True)
-    os.makedirs(os.path.join(chat_dir, "summaries"), exist_ok=True)
-    return chat_dir
+def create_chat_dir(cache_dir: str, chat_id: int) -> str:
+    """
+    Create the directory structure for a chat.
+
+    Args:
+        cache_dir: The base cache directory.
+        chat_id: The ID of the chat.
+
+    Returns:
+        str: The path to the created chat directory.
+    """
+    chat_dir = Path(cache_dir) / "chats" / str(chat_id)
+    for subdir in ["voice_messages", "transcripts", "summaries"]:
+        (chat_dir / subdir).mkdir(parents=True, exist_ok=True)
+    return str(chat_dir)
 
 
-def save_to_chat_meta(chat_dir, voice_id, transcript=None, summary=None):
-    chat_id = os.path.basename(chat_dir)
-    chat_meta_path = os.path.join(chat_dir, f"{chat_id}.csv")
+def save_to_chat_meta(
+    chat_dir: str, voice_id: str, transcript: Optional[str] = None, summary: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Save metadata about a voice message to the chat's metadata file.
 
-    if not os.path.exists(chat_meta_path):
+    Args:
+        chat_dir: The directory for the chat.
+        voice_id: The ID of the voice message.
+        transcript: The transcript text (optional).
+        summary: The summary text (optional).
+
+    Returns:
+        pd.DataFrame: The updated chat metadata.
+    """
+    chat_id = Path(chat_dir).name
+    chat_meta_path = Path(chat_dir) / f"{chat_id}.csv"
+
+    if not chat_meta_path.exists():
         chat_meta = pd.DataFrame(columns=CHAT_META_COLUMNS)
-        chat_meta.to_csv(chat_meta_path, index=False)
-
-    chat_meta = pd.read_csv(chat_meta_path)
-
-    if transcript is not None:
-        transcript_date = pd.Timestamp.now()
-        transcript_path = os.path.join(chat_dir, "transcripts", f"{voice_id}.txt")
-        transcript_words = len(transcript.split())
     else:
-        transcript_date = None
-        transcript_path = None
-        transcript_words = None
+        chat_meta = pd.read_csv(chat_meta_path)
 
-    if summary is not None:
-        summary_date = pd.Timestamp.now()
-        summary_path = os.path.join(chat_dir, "summaries", f"{voice_id}.txt")
-        summary_words = len(summary.split())
-    else:
-        summary_date = None
-        summary_path = None
-        summary_words = None
+    new_row = {
+        "voice_id": voice_id,
+        "transcript_date": pd.Timestamp.now() if transcript else None,
+        "summary_date": pd.Timestamp.now() if summary else None,
+        "transcript_path": str(Path(chat_dir) / "transcripts" / f"{voice_id}.txt") if transcript else None,
+        "summary_path": str(Path(chat_dir) / "summaries" / f"{voice_id}.txt") if summary else None,
+        "transcript_words": len(transcript.split()) if transcript else None,
+        "summary_words": len(summary.split()) if summary else None,
+    }
 
     if voice_id not in chat_meta["voice_id"].values:
-        new_row = {
-            "voice_id": voice_id,
-            "transcript_date": transcript_date,
-            "summary_date": summary_date,
-            "transcript_path": transcript_path,
-            "summary_path": summary_path,
-            "transcript_words": transcript_words,
-            "summary_words": summary_words,
-        }
-        new_row = pd.DataFrame([new_row])
-        chat_meta = pd.concat([chat_meta, new_row], ignore_index=True)
+        chat_meta = pd.concat([chat_meta, pd.DataFrame([new_row])], ignore_index=True)
     else:
         idx = chat_meta[chat_meta["voice_id"] == voice_id].index[0]
-        chat_meta.at[idx, "transcript_date"] = transcript_date
-        chat_meta.at[idx, "transcript_path"] = transcript_path
-        chat_meta.at[idx, "transcript_words"] = transcript_words
-        chat_meta.at[idx, "summary_date"] = summary_date
-        chat_meta.at[idx, "summary_path"] = summary_path
-        chat_meta.at[idx, "summary_words"] = summary_words
+        chat_meta.loc[idx, new_row.keys()] = new_row.values()
 
     chat_meta.to_csv(chat_meta_path, index=False)
     return chat_meta
 
 
-def get_chat_meta(chat_dir):
-    chat_id = os.path.basename(chat_dir)
-    chat_meta_path = os.path.join(chat_dir, f"{chat_id}.csv")
+def get_chat_meta(chat_dir: str) -> Optional[pd.DataFrame]:
+    """
+    Load the metadata for a chat.
 
-    if not os.path.exists(chat_meta_path):
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[pd.DataFrame]: The chat metadata if it exists, None otherwise.
+    """
+    chat_id = Path(chat_dir).name
+    chat_meta_path = Path(chat_dir) / f"{chat_id}.csv"
+
+    if not chat_meta_path.exists():
         return None
 
-    chat_meta = pd.read_csv(chat_meta_path)
-    return chat_meta
+    return pd.read_csv(chat_meta_path)
 
 
-def transcripts_from(chat_dir, from_date, to_date, just_today=False):
+def transcripts_from(
+    chat_dir: str, from_date: Optional[pd.Timestamp], to_date: Optional[pd.Timestamp], just_today: bool = False
+) -> Optional[List[str]]:
+    """
+    Get transcripts from a specified date range.
+
+    Args:
+        chat_dir: The directory for the chat.
+        from_date: The start date for the range.
+        to_date: The end date for the range.
+        just_today: If True, only get transcripts from today.
+
+    Returns:
+        Optional[List[str]]: A list of transcripts, or None if no transcripts are found.
+    """
     chat_meta = get_chat_meta(chat_dir)
-    if chat_meta is None:
+    if chat_meta is None or chat_meta.empty:
         return None
 
-    # drop rows with missing transcript_date
     chat_meta = chat_meta.dropna(subset=["transcript_date"])
-    if len(chat_meta) == 0:
-        return None
-
     chat_meta["transcript_date"] = pd.to_datetime(chat_meta["transcript_date"])
 
     if just_today:
@@ -218,25 +332,33 @@ def transcripts_from(chat_dir, from_date, to_date, just_today=False):
             (chat_meta["transcript_date"].dt.date >= from_date) & (chat_meta["transcript_date"].dt.date <= to_date)
         ]
 
-    loaded_transcripts = []
-    for idx, row in transcripts.iterrows():
-        transcript = load_transcript(row["voice_id"], chat_dir)
-        if transcript is not None:
-            loaded_transcripts.append(transcript)
-
-    return loaded_transcripts
+    return [
+        load_transcript(row["voice_id"], chat_dir)
+        for _, row in transcripts.iterrows()
+        if load_transcript(row["voice_id"], chat_dir) is not None
+    ]
 
 
-def summaries_from(chat_dir, from_date, to_date, just_today=False):
+def summaries_from(
+    chat_dir: str, from_date: Optional[pd.Timestamp], to_date: Optional[pd.Timestamp], just_today: bool = False
+) -> Optional[List[str]]:
+    """
+    Get summaries from a specified date range.
+
+    Args:
+        chat_dir: The directory for the chat.
+        from_date: The start date for the range.
+        to_date: The end date for the range.
+        just_today: If True, only get summaries from today.
+
+    Returns:
+        Optional[List[str]]: A list of summaries, or None if no summaries are found.
+    """
     chat_meta = get_chat_meta(chat_dir)
-    if chat_meta is None:
+    if chat_meta is None or chat_meta.empty:
         return None
 
-    # drop rows with missing summary_date
     chat_meta = chat_meta.dropna(subset=["summary_date"])
-    if len(chat_meta) == 0:
-        return None
-
     chat_meta["summary_date"] = pd.to_datetime(chat_meta["summary_date"])
 
     if just_today:
@@ -247,110 +369,121 @@ def summaries_from(chat_dir, from_date, to_date, just_today=False):
             (chat_meta["summary_date"].dt.date >= from_date) & (chat_meta["summary_date"].dt.date <= to_date)
         ]
 
-    loaded_summaries = []
-    for idx, row in summaries.iterrows():
-        summary = load_summary(row["voice_id"], chat_dir)
-        if summary is not None:
-            loaded_summaries.append(summary)
-
-    return loaded_summaries
+    return [
+        load_summary(row["voice_id"], chat_dir)
+        for _, row in summaries.iterrows()
+        if load_summary(row["voice_id"], chat_dir) is not None
+    ]
 
 
-def get_transcripts_last_7_days(chat_dir):
+def get_transcripts_last_7_days(chat_dir: str) -> Optional[List[str]]:
+    """
+    Get transcripts from the last 7 days.
+
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[List[str]]: A list of transcripts from the last 7 days, or None if no transcripts are found.
+    """
     today = pd.Timestamp.now().date()
     last_7_days = today - pd.DateOffset(days=7)
     return transcripts_from(chat_dir, last_7_days, today)
 
 
-def create_summary_today(chat_dir):
-    transcripts = transcripts_from(chat_dir, None, None, just_today=True)
-    str_transcripts = ""
-    for i, transcript in enumerate(transcripts, start=1):
-        str_transcripts += f"Transcript {i}:\n{transcript}\n\n"
+def create_summary_today(chat_dir: str) -> Optional[str]:
+    """
+    Create a summary of all transcripts from today.
 
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[str]: A summary of today's transcripts, or None if no transcripts are found.
+    """
+    transcripts = transcripts_from(chat_dir, None, None, just_today=True)
+    if not transcripts:
+        return None
+
+    str_transcripts = "\n\n".join(f"Transcript {i}:\n{transcript}" for i, transcript in enumerate(transcripts, start=1))
     return summarize_transcript(str_transcripts, is_multi=True)
 
 
-def create_summary_7_days(chat_dir):
-    transcripts = get_transcripts_last_7_days(chat_dir)
-    str_transcripts = ""
-    for i, transcript in enumerate(transcripts, start=1):
-        str_transcripts += f"Transcript {i}:\n{transcript}\n\n"
+def create_summary_7_days(chat_dir: str) -> Optional[str]:
+    """
+    Create a summary of all transcripts from the last 7 days.
 
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[str]: A summary of the last 7 days' transcripts, or None if no transcripts are found.
+    """
+    transcripts = get_transcripts_last_7_days(chat_dir)
+    if not transcripts:
+        return None
+
+    str_transcripts = "\n\n".join(f"Transcript {i}:\n{transcript}" for i, transcript in enumerate(transcripts, start=1))
     return summarize_transcript(str_transcripts)
 
 
-def get_summaries_last_7_days(chat_dir):
+def get_summaries_last_7_days(chat_dir: str) -> Optional[List[str]]:
+    """
+    Get summaries from the last 7 days.
+
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[List[str]]: A list of summaries from the last 7 days, or None if no summaries are found.
+    """
     today = pd.Timestamp.now().date()
     last_7_days = today - pd.DateOffset(days=7)
     return summaries_from(chat_dir, last_7_days, today)
 
 
-def get_chat_stats(chat_dir):
+def get_chat_stats(chat_dir: str) -> Optional[Dict[str, Dict[str, int]]]:
+    """
+    Get statistics for the chat.
+
+    Args:
+        chat_dir: The directory for the chat.
+
+    Returns:
+        Optional[Dict[str, Dict[str, int]]]: A dictionary containing chat statistics,
+        or None if no data is available.
+    """
     chat_meta = get_chat_meta(chat_dir)
-    if chat_meta is None:
+    if chat_meta is None or chat_meta.empty:
         return None
 
-    today = pd.Timestamp.now().date()
-    last_7_days = today - pd.DateOffset(days=7)
-    last_30_days = today - pd.DateOffset(days=30)
+    today = pd.Timestamp.now().normalize()
+    last_7_days = today - DateOffset(days=7)
+    last_30_days = today - DateOffset(days=30)
 
-    today_chat_meta = chat_meta[chat_meta["transcript_date"].dt.date == today]
-    last_7_days_chat_meta = chat_meta[chat_meta["transcript_date"].dt.date >= last_7_days]
-    last_30_days_chat_meta = chat_meta[chat_meta["transcript_date"].dt.date >= last_30_days]
+    chat_meta["transcript_date"] = pd.to_datetime(chat_meta["transcript_date"]).dt.normalize()
+    chat_meta["summary_date"] = pd.to_datetime(chat_meta["summary_date"]).dt.normalize()
 
-    count_today_transcripts = len(today_chat_meta)
-    count_last_7_days_transcripts = len(last_7_days_chat_meta)
-    count_last_30_days_transcripts = len(last_30_days_chat_meta)
-    count_all_time_transcripts = len(chat_meta)
+    def get_period_stats(df: pd.DataFrame) -> Dict[str, int]:
+        """
+        Calculate statistics for a given period.
 
-    today_summaries = today_chat_meta[today_chat_meta["summary_date"].notnull()]
-    last_7_days_summaries = last_7_days_chat_meta[last_7_days_chat_meta["summary_date"].notnull()]
-    last_30_days_summaries = last_30_days_chat_meta[last_30_days_chat_meta["summary_date"].notnull()]
-    all_time_summaries = chat_meta[chat_meta["summary_date"].notnull()]
+        Args:
+            df: DataFrame containing the data for the period.
 
-    count_today_summaries = len(today_summaries)
-    count_last_7_days_summaries = len(last_7_days_summaries)
-    count_last_30_days_summaries = len(last_30_days_summaries)
-    count_all_time_summaries = len(all_time_summaries)
-
-    today_transcript_words = today_chat_meta["transcript_words"].sum()
-    last_7_days_transcript_words = last_7_days_chat_meta["transcript_words"].sum()
-    last_30_days_transcript_words = last_30_days_chat_meta["transcript_words"].sum()
-    all_time_transcript_words = chat_meta["transcript_words"].sum()
-
-    today_summary_words = today_chat_meta["summary_words"].sum()
-    last_7_days_summary_words = last_7_days_chat_meta["summary_words"].sum()
-    last_30_days_summary_words = last_30_days_chat_meta["summary_words"].sum()
-    all_time_summary_words = chat_meta["summary_words"].sum()
+        Returns:
+            Dict[str, int]: A dictionary of statistics for the period.
+        """
+        return {
+            "transcripts": len(df),
+            "summaries": df["summary_date"].notna().sum(),
+            "transcript_words": int(df["transcript_words"].sum()),
+            "summary_words": int(df["summary_words"].sum()),
+        }
 
     return {
-        "today": {
-            "transcripts": count_today_transcripts,
-            "summaries": count_today_summaries,
-            "transcript_words": today_transcript_words,
-            "summary_words": today_summary_words,
-            "word_difference": today_transcript_words - today_summary_words,
-        },
-        "last_7_days": {
-            "transcripts": count_last_7_days_transcripts,
-            "summaries": count_last_7_days_summaries,
-            "transcript_words": last_7_days_transcript_words,
-            "summary_words": last_7_days_summary_words,
-            "word_difference": last_7_days_transcript_words - last_7_days_summary_words,
-        },
-        "last_30_days": {
-            "transcripts": count_last_30_days_transcripts,
-            "summaries": count_last_30_days_summaries,
-            "transcript_words": last_30_days_transcript_words,
-            "summary_words": last_30_days_summary_words,
-            "word_difference": last_30_days_transcript_words - last_30_days_summary_words,
-        },
-        "all_time": {
-            "transcripts": count_all_time_transcripts,
-            "summaries": count_all_time_summaries,
-            "transcript_words": all_time_transcript_words,
-            "summary_words": all_time_summary_words,
-            "word_difference": all_time_transcript_words - all_time_summary_words,
-        },
+        "today": get_period_stats(chat_meta[chat_meta["transcript_date"] == today]),
+        "last_7_days": get_period_stats(chat_meta[chat_meta["transcript_date"] >= last_7_days]),
+        "last_30_days": get_period_stats(chat_meta[chat_meta["transcript_date"] >= last_30_days]),
+        "all_time": get_period_stats(chat_meta),
     }

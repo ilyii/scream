@@ -11,7 +11,10 @@
         "editor.tabSize": 4,
         "editor.rulers": [
             120
-        ]
+        ],
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "never"
+        }
     },
     // Files to exclude in the explorer
     "files.exclude": {
@@ -54,54 +57,4 @@
     "[markdown]": {
         "files.trimTrailingWhitespace": false
     },
-    // Change font
-    // "editor.fontFamily": "Geist Mono",
-    // "scm.inputFontFamily": "Geist Mono",
-    // "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font",
-    // "chat.editor.fontFamily": "Geist Mono",
-    // "debug.console.fontFamily": "Geist Mono",
-    // "editor.codeLensFontFamily": "Geist Mono",
-    // "notebook.output.fontFamily": "Geist Mono",
-    // "markdown.preview.fontFamily": "Geist Mono",
-    // "editor.inlayHints.fontFamily": "Geist Mono",
-    // Theme
-    // "workbench.colorTheme": "Catppuccin Macchiato",
-    // "workbench.iconTheme": "catppuccin-mocha",
-    // Font size
-    // "editor.fontSize": 14,
-    // "terminal.integrated.fontSize": 14,
-    // ui
-    // "editor.minimap.enabled": false,
-    // "window.commandCenter": false,
-    // "editor.scrollbar.vertical": "auto",
-    // "editor.scrollbar.horizontal": "auto",
-    // // APC
-    // "apc.activityBar": {
-    //     "position": "bottom",
-    //     "hideSettings": true,
-    //     "size": 28
-    // },
-    // "apc.electron": {
-    //     "titleBarStyle": "hiddenInset",
-    //     "trafficLightPosition": {
-    //         "x": 12,
-    //         "y": 10
-    //     }
-    // },
-    // "apc.font.family": "Geist Mono",
-    // "apc.monospace.font.family": "Geist Mono",
-    // "apc.statusBar": {
-    //     "position": "editor-bottom",
-    //     "height": 28,
-    //     "fontSize": 12
-    // },
-    // // Misc
-    // "workbench.startupEditor": "none",
-    // "explorer.compactFolders": false,
-    // "editor.linkedEditing": true,
-    // "breadcrumbs.filePath": "off",
-    // "files.trimTrailingWhitespace": true,
-    // "editor.bracketPairColorization.enabled": true,
-    // "editor.guides.bracketPairs": true,
-    // "window.zoomLevel": 1
 }
