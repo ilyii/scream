@@ -11,12 +11,14 @@ from typing import Optional
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama.llms import OllamaLLM
 
 # Load environment variables
 load_dotenv()
 
 # Constants
 MODEL_NAME = "gemini-1.5-flash"
+OLLAMA_MODEL = "llama3.2:3b"
 API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Prompt templates
@@ -89,17 +91,21 @@ def load_model_summarize() -> None:
         ValueError: If the GEMINI_API_KEY is not set in the environment variables.
     """
     global summarize_model
-    if not API_KEY:
-        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
 
-    summarize_model = ChatGoogleGenerativeAI(
-        model=MODEL_NAME,
-        temperature=0.2,
-        max_tokens=1024,
-        google_api_key=API_KEY,
-        timeout=None,
-        max_retries=2,
-    )
+    try:
+        summarize_model = ChatGoogleGenerativeAI(
+            model=MODEL_NAME,
+            temperature=0.3,
+            max_tokens=2048,
+            google_api_key=API_KEY,
+            timeout=None,
+            max_retries=2,
+        )
+    except Exception as e:
+        print(f"Error loading summarize model: {str(e)}")
+        print("Please check if the GEMINI_API_KEY is set in the environment variables.")
+        print("Loading Ollama LLM as a fallback...")
+        summarize_model = OllamaLLM(model=OLLAMA_MODEL, temperature=0.3, max_tokens=2048)
 
 
 def summarize_transcript(transcript: str, is_multi: bool = False) -> str:

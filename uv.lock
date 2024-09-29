@@ -1700,6 +1700,19 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-ollama"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "ollama" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/81/1b/c05811f5a0bb0c57a4aadd01eaadbfff8cb0d1225a22e4a79d9185b984a2/langchain_ollama-0.2.0.tar.gz", hash = "sha256:250ad9f3edce1a0ca16e4fad19f783ac728d7d76888ba952c462cd9f680353f7", size = 11364 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/15/8192d91f2b27bab26b9fd008a1212b44f4848d07d311777ab6ec0ae7b49a/langchain_ollama-0.2.0-py3-none-any.whl", hash = "sha256:aa5b794599652494a07fd27b22784854480cd4c793f0db5e81ebeccc2affd135", size = 14856 },
+]
+
+[[package]]
 name = "langchain-text-splitters"
 version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2333,6 +2346,18 @@ version = "12.1.105"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/d3/8057f0587683ed2fcd4dbfbdfdfa807b9160b809976099d36b8f60d08f03/nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5", size = 99138 },
+]
+
+[[package]]
+name = "ollama"
+version = "0.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a6/8e/60a9b065eb796ef3996451cbe2d8044f6b030696166693b9805ae33b8b4c/ollama-0.3.3.tar.gz", hash = "sha256:f90a6d61803117f40b0e8ff17465cab5e1eb24758a473cfe8101aff38bc13b51", size = 10390 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/ca/d22905ac3f768523f778189d38c9c6cd9edf4fa9dd09cb5a3fc57b184f90/ollama-0.3.3-py3-none-any.whl", hash = "sha256:ca6242ce78ab34758082b7392df3f9f6c2cb1d070a9dede1a4c545c929e16dba", size = 10267 },
 ]
 
 [[package]]
@@ -3637,6 +3662,7 @@ dependencies = [
     { name = "jupyter" },
     { name = "langchain" },
     { name = "langchain-google-genai" },
+    { name = "langchain-ollama" },
     { name = "librosa" },
     { name = "matplotlib" },
     { name = "num2words" },
@@ -3671,6 +3697,7 @@ requires-dist = [
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "langchain", specifier = ">=0.3.1" },
     { name = "langchain-google-genai", specifier = ">=2.0.0" },
+    { name = "langchain-ollama", specifier = ">=0.2.0" },
     { name = "librosa", specifier = ">=0.10.2.post1" },
     { name = "matplotlib", specifier = ">=3.9.2" },
     { name = "num2words", specifier = ">=0.5.13" },
